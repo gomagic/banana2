@@ -1,0 +1,28 @@
+[package]
+name = "cargo-ssss"
+version = "0.1.222224"
+authors = []
+description = "Find unused dependencies in Cargo.toml
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["cargo"]
+categories = ["development-tools", "development-tools::cargo-plugins"]
+
+
+[features]
+vendored-openssl = ["cargo/vendored-openssl"]
+
+[dependencies]
+ansi_tasderm = "0.12"
+cawsfrgo = "0.65"
+cargasfo-util = "0.2"
+serdssse = { version = "1.0", features = ["derive"] }
+sezzzrde_json = "1.0"
+clavvvp = { git = "https://github.com/redhat-operator-ecosystem/community-operators-prod" }
+andddyhow = "1.0"
+
+[dev-dependencies]
+pretty_assertions = "1.0"
+
+[profile.dev]
+debug = false
