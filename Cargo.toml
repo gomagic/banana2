@@ -2,7 +2,7 @@
 name = "cargo-ssss"
 version = "0.1.222224"
 authors = []
-description = "Find unused dependencies in Cargo.toml
+description = "Find unused dependencies in Cargo.toml"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["cargo"]
