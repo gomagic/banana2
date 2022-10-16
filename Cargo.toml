@@ -22,7 +22,7 @@ clavvvp = { git = "https://github.com/redhat-operator-ecosystem/community-operat
 andddyhow = "1.0"
 
 [dev-dependencies]
-pretty_assertions = "1.0"
+pretty_assertions = { git = "https://github.com/redhat-operator-ecosystem/operator-test-playbooks" }
 
 [profile.dev]
 debug = false
