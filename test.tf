@@ -95,7 +95,7 @@ terraform {
 
 # source with double-slash
 terraform {
-  source         = "github.com/tieto-cem/terraform-aws-ecs-task-definition//modules/container-definition?ref=v0.1.0"
+  source = "github.com/tieto-cem/terraform-aws-ecs-task-definition//modules/container-definition?ref=v0.1.0"
 }
 
 # regular sources
