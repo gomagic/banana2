@@ -1,166 +1,323 @@
-#real
-terraform {
-  extra_arguments "common_vars" {
-    commands = ["plan", "apply"]
+// Instances of machines in os_compat environment
+// !!! Don't forget to add machines to test_compatibility.py if you add here !!!
 
-    arguments = [
-      "-var-file=../../common.tfvars",
-      "-var-file=../region.tfvars"
-    ]
+
+resource "aws_instance" "island" {
+  ami           = "ami-004f0217ce761fc9a"
+  instance_type = "t2.micro"
+  private_ip = "10.0.0.251"
+  subnet_id = "${aws_subnet.main.id}"
+  key_name = "os_compat"
+  tags = {
+    Name = "os_compat_ISLAND"
   }
-
-  before_hook "before_hook" {
-    commands     = ["apply", "plan"]
-    execute      = ["echo", "Running Terraform"]
-  }
-
-  source = "github.com/myuser/myrepo//folder/modules/moduleone?ref=v0.0.9"
-
-  after_hook "after_hook" {
-    commands     = ["apply", "plan"]
-    execute      = ["echo", "Finished running Terraform"]
-    run_on_error = true
+  vpc_security_group_ids = ["${aws_security_group.os_compat_island.id}"]
+  associate_public_ip_address = true
+  root_block_device {
+    volume_size           = "30"
+    volume_type           = "standard"
+    delete_on_termination = true
   }
 }
 
-#foo
-terraform {
-  source = "github.com/hashicorp/example?ref=v1.0.0"
+locals {
+  env_vars = {
+    subnet_id = "${aws_subnet.main.id}"
+    vpc_security_group_ids = "${aws_security_group.os_compat_instance.id}"
+  }
+
+  user_data_linux_64 = <<EOF
+Content-Type: multipart/mixed; boundary="//"
+MIME-Version: 1.0
+
+--//
+Content-Type: text/cloud-config; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="cloud-config.txt"
+
+#cloud-config
+cloud_final_modules:
+- [scripts-user, always]
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="userdata.txt"
+#!/bin/bash
+rm ./monkey-linux-64
+wget --no-check-certificate -q https://10.0.0.251:5000/api/agent-binaries/linux -O ./monkey-linux-64 || curl https://10.0.0.251:5000/api/agent-binaries/linux -k -o monkey-linux-64
+chmod +x ./monkey-linux-64
+./monkey-linux-64 m0nk3y -s 10.0.0.251:5000
+--//
+EOF
+
+  user_data_windows_64 = <<EOF
+<powershell>
+add-type @"
+    using System.Net;
+    using System.Security.Cryptography.X509Certificates;
+    public class TrustAllCertsPolicy : ICertificatePolicy {
+        public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+        }
+    }
+"@
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+Invoke-WebRequest -Uri 'https://10.0.0.251:5000/api/agent-binaries/windows' -OutFile 'C:\windows\temp\monkey-windows-64.exe' -UseBasicParsing
+C:\windows\temp\monkey-windows-64.exe m0nk3y -s 10.0.0.251:5000
+</powershell>
+<persist>true</persist>
+EOF
 }
 
-#bar
-terraform {
-  source = "github.com/hashicorp/example?ref=next"
+module "centos_6" {
+  source = "./instance_template"
+  name = "centos_6"
+  ami = "ami-07fa74e425f2abf29"
+  ip = "10.0.0.36"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#hostname
-terraform {
-  source = "https://104.196.242.174"example?ref=next"
+module "centos_7" {
+  source = "./instance_template"
+  name = "centos_7"
+  ami = "ami-0034b52a39b9fb0e8"
+  ip = "10.0.0.37"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#local hostname
-terraform {
-  source = "my.host.local/example?ref=v1.2.1"
+module "centos_8" {
+  source = "./instance_template"
+  name = "centos_8"
+  ami = "ami-0034c84e4e9c557bd"
+  ip = "10.0.0.38"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#local hostname
-terraform {
-  source = "my.host/modules/test"
+module "suse_12" {
+  source = "./instance_template"
+  name = "suse_12"
+  ami = "ami-07b12b913a7e36b08"
+  ip = "10.0.0.42"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#local hostname
-terraform {
-  source = "my.host/modules/test?ref=v1.2.1"
+module "suse_11" {
+  source = "./instance_template"
+  name = "suse_11"
+  ami = "ami-0083986c"
+  ip = "10.0.0.41"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#local hostname
-terraform {
-  source = "my.host"
+module "kali_2019" {
+  source = "./instance_template"
+  name = "kali_2019"
+  ami = "ami-05d64b1d0f967d4bf"
+  ip = "10.0.0.99"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#local hostname
-terraform {
-  source = "my.host.local/sources/example?ref=v1.2.1"
+// Requires m3.medium which usually isn't available
+//module "rhel_5" {
+//  source = "./instance_template"
+//  name = "rhel_5"
+//  ami = "ami-a48cbfb9"
+//  type = "m3.medium"
+//  ip = "10.0.0.85"
+//  env_vars = "${local.env_vars}"
+//  user_data = "${local.user_data_linux_64}"
+//}
+
+module "rhel_6" {
+  source = "./instance_template"
+  name = "rhel_6"
+  ami = "ami-0af3f0e0918f47bcf"
+  ip = "10.0.0.86"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#ip
-terraform {
-  source = "my.host/example?ref=next"
+module "rhel_7" {
+  source = "./instance_template"
+  name = "rhel_7"
+  ami = "ami-0b5edb134b768706c"
+  ip = "10.0.0.87"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#invalid
-terraform {
-  source = "//terraform/module/test?ref=next"
+module "rhel_8" {
+  source = "./instance_template"
+  name = "rhel_8"
+  ami = "ami-0badcc5b522737046"
+  ip = "10.0.0.88"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#repo-with-non-semver-ref
-terraform {
-  source = "github.com/githubuser/myrepo//terraform/modules/moduleone?ref=tfmodule_one-v0.0.9"
+module "debian_7" {
+  source = "./instance_template"
+  name = "debian_7"
+  ami = "ami-0badcc5b522737046"
+  ip = "10.0.0.77"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#repo-with-dot
-terraform {
-  source = "github.com/hashicorp/example.2.3?ref=v1.0.0"
+module "debian_8" {
+  source = "./instance_template"
+  name = "debian_8"
+  ami = "ami-0badcc5b522737046"
+  ip = "10.0.0.78"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#repo-with-dot-and-git-suffix
-terraform {
-  source = "github.com/hashicorp/example.2.3.git?ref=v1.0.0"
+module "debian_9" {
+  source = "./instance_template"
+  name = "debian_9"
+  ami = "ami-0badcc5b522737046"
+  ip = "10.0.0.79"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-#source without pinning
-terraform {
-  source  = "hashicorp/consul/aws"
+module "oracle_6" {
+  source = "./instance_template"
+  name = "oracle_6"
+  ami = "ami-0f9b69f34108a3770"
+  ip = "10.0.0.66"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-# source with double-slash
-terraform {
-  source = "github.com/tieto-cem/terraform-aws-ecs-task-definition//modules/container-definition?ref=v0.1.0"
+module "oracle_7" {
+  source = "./instance_template"
+  name = "oracle_7"
+  ami = "ami-001e494dc0f3372bc"
+  ip = "10.0.0.67"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-# regular sources
-terraform {
-  source = "github.com/tieto-cem/terraform-aws-ecs-task-definition?ref=v0.1.0"
+module "ubuntu_12" {
+  source = "./instance_template"
+  name = "ubuntu_12"
+  ami = "ami-003d0b1d"
+  ip = "10.0.0.22"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-terraform {
-  source = "git@github.com:hashicorp/example.git?ref=v2.0.0"
+// Requires m3.medium instance which usually isn't available
+// module "ubuntu_12_32" {
+//   source = "./instance_template"
+//   name = "ubuntu_12_32"
+//   ami = "ami-06003c1b"
+//   ip = "10.0.0.23"
+//   env_vars = "${local.env_vars}"
+//   user_data = "${local.user_data_linux_32}"
+// }
+
+module "ubuntu_14" {
+  source = "./instance_template"
+  name = "ubuntu_14"
+  ami = "ami-067ee10914e74ffee"
+  ip = "10.0.0.24"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-terraform {
-  source = "terraform-aws-modules/security-group/aws//modules/http-80"
-
+module "ubuntu_19" {
+  source = "./instance_template"
+  name = "ubuntu_19"
+  ami = "ami-001b87954b72ea3ac"
+  ip = "10.0.0.29"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_linux_64}"
 }
 
-terraform {
-  source  = "terraform-aws-modules/security-group/aws"
+module "windows_2003_r2_32" {
+  source = "./instance_template"
+  name = "windows_2003_r2_32"
+  ami = "ami-01e4fa6d"
+  ip = "10.0.0.4"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
 
-terraform {
-  source = "../../terraforms/fe"
+module "windows_2003" {
+  source = "./instance_template"
+  name = "windows_2003"
+  ami = "ami-9e023183"
+  ip = "10.0.0.5"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
 
-# nosource, ignored by test since it does not have source on the next line
-terraform {
-  foo = "bar"
+module "windows_2008_r2" {
+  source = "./instance_template"
+  name = "windows_2008_r2"
+  ami = "ami-05af5509c2c73e36e"
+  ip = "10.0.0.8"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
 
-# foobar
-terraform {
-  source = "https://bitbucket.com/hashicorp/example?ref=v1.0.0"
+
+module "windows_2008_32" {
+  source = "./instance_template"
+  name = "windows_2008_32"
+  ami = "ami-3606352b"
+  ip = "10.0.0.6"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_32}"
 }
 
-# gittags
-terraform {
-  source = "git::https://bitbucket.com/hashicorp/example?ref=v1.0.0"
+module "windows_2012" {
+  source = "./instance_template"
+  name = "windows_2012"
+  ami = "ami-0d8c60e4d3ca36ed6"
+  ip = "10.0.0.12"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
 
-# gittags_badversion
-terraform {
-  source = "git::https://bitbucket.com/hashicorp/example?ref=next"
+module "windows_2012_r2" {
+  source = "./instance_template"
+  name = "windows_2012_r2"
+  ami = "ami-08dcceb529e70f875"
+  ip = "10.0.0.11"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
 
-# gittags_subdir
-terraform {
-  source = "git::https://bitbucket.com/hashicorp/example//subdir/test?ref=v1.0.1"
+module "windows_2016" {
+  source = "./instance_template"
+  name = "windows_2016"
+  ami = "ami-02a6791b44938cfcd"
+  ip = "10.0.0.116"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
 
-# gittags_http
-terraform {
-  source = "git::http://bitbucket.com/hashicorp/example?ref=v1.0.2"
-}
-
-# gittags_ssh
-terraform {
-  source = "git::ssh://git@bitbucket.com/hashicorp/example?ref=v1.0.3"
-}
-
-# invalid, ignored by test since it does not have source on the next line
-terraform {
-}
-
-# unsupported terragrunt, ignored by test since it does not have source on the next line
-terraform {
-  name  = "foo"
-  dummy = "true"
+module "windows_2019" {
+  source = "./instance_template"
+  name = "windows_2019"
+  ami = "ami-09fe2745618d2af42"
+  ip = "10.0.0.119"
+  env_vars = "${local.env_vars}"
+  user_data = "${local.user_data_windows_64}"
 }
